@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grid Analyzer - AE Script Generator</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 30px;
+        }
+        
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        @media (max-width: 900px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .panel {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 20px;
+        }
+        
+        .panel h2 {
+            margin-bottom: 15px;
+            font-size: 18px;
+            color: #4ecca3;
+        }
+        
+        .upload-zone {
+            border: 2px dashed #4ecca3;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 15px;
+        }
+        
+        .upload-zone:hover {
+            background: rgba(78, 204, 163, 0.1);
+        }
+        
+        .upload-zone.dragover {
+            background: rgba(78, 204, 163, 0.2);
+            border-color: #fff;
+        }
+        
+        .upload-zone input {
+            display: none;
+        }
+        
+        .preview-container {
+            position: relative;
+            margin-bottom: 15px;
+        }
+        
+        #preview {
+            max-width: 100%;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        #canvas-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+        
+        .results {
+            background: #0f0f23;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .results h3 {
+            font-size: 14px;
+            color: #4ecca3;
+            margin-bottom: 10px;
+        }
+        
+        .grid-line {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #2a2a4a;
+        }
+        
+        .grid-line:last-child {
+            border-bottom: none;
+        }
+        
+        .grid-line .label {
+            color: #888;
+        }
+        
+        .grid-line .value {
+            color: #fff;
+            font-family: monospace;
+        }
+        
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .option-group label {
+            display: block;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 5px;
+        }
+        
+        .option-group input, .option-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #2a2a4a;
+            border-radius: 6px;
+            background: #0f0f23;
+            color: #fff;
+            font-size: 14px;
+        }
+        
+        .option-group input:focus, .option-group select:focus {
+            outline: none;
+            border-color: #4ecca3;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: #4ecca3;
+            color: #1a1a2e;
+        }
+        
+        .btn-primary:hover {
+            background: #3db892;
+        }
+        
+        .btn-primary:disabled {
+            background: #2a4a3e;
+            color: #666;
+            cursor: not-allowed;
+        }
+        
+        .btn-secondary {
+            background: #2a2a4a;
+            color: #fff;
+            margin-top: 10px;
+        }
+        
+        .btn-secondary:hover {
+            background: #3a3a5a;
+        }
+        
+        .shape-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .shape-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background: #0f0f23;
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+        
+        .shape-color {
+            width: 30px;
+            height: 30px;
+            border-radius: 4px;
+            margin-right: 12px;
+            border: 2px solid #fff;
+        }
+        
+        .shape-info {
+            flex: 1;
+        }
+        
+        .shape-name {
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        
+        .shape-dims {
+            font-size: 12px;
+            color: #888;
+            font-family: monospace;
+        }
+        
+        .status {
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 15px;
+            text-align: center;
+        }
+        
+        .status.success {
+            background: rgba(78, 204, 163, 0.2);
+            color: #4ecca3;
+        }
+        
+        .status.error {
+            background: rgba(255, 100, 100, 0.2);
+            color: #ff6464;
+        }
+        
+        .status.info {
+            background: rgba(100, 150, 255, 0.2);
+            color: #6496ff;
+        }
+        
+        .instructions {
+            font-size: 13px;
+            color: #888;
+            line-height: 1.6;
+        }
+        
+        .instructions ol {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+        
+        .instructions li {
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Grid Analyzer</h1>
+        <p class="subtitle">Upload a grid layout → Get an After Effects script with null controls</p>
+        
+        <div class="main-grid">
+            <!-- Left Panel: Upload & Preview -->
+            <div class="panel">
+                <h2>1. Upload Reference Image</h2>
+                
+                <div class="upload-zone" id="uploadZone">
+                    <p>📁 Drop image here or click to upload</p>
+                    <p style="font-size: 12px; color: #666; margin-top: 10px;">Supports PNG, JPG, GIF</p>
+                    <input type="file" id="fileInput" accept="image/*">
+                </div>
+                
+                <div class="preview-container">
+                    <img id="preview" alt="Preview">
+                    <canvas id="canvas-overlay"></canvas>
+                </div>
+                
+                <button class="btn btn-primary" id="analyzeBtn" disabled>🔍 Analyze Grid</button>
+                
+                <div class="results" id="results" style="display: none;">
+                    <h3>Detected Shapes</h3>
+                    <div id="gridLines"></div>
+                </div>
+            </div>
+            
+            <!-- Right Panel: Output & Options -->
+            <div class="panel">
+                <h2>2. Configure Output</h2>
+                
+                <div class="options-grid">
+                    <div class="option-group">
+                        <label>Comp Width (px)</label>
+                        <input type="number" id="compWidth" value="1920">
+                    </div>
+                    <div class="option-group">
+                        <label>Comp Height (px)</label>
+                        <input type="number" id="compHeight" value="1080">
+                    </div>
+                    <div class="option-group">
+                        <label>Label Font Size</label>
+                        <input type="number" id="fontSize" value="48">
+                    </div>
+                    <div class="option-group">
+                        <label>Edge Overlap (px)</label>
+                        <input type="number" id="overlap" value="2">
+                    </div>
+                </div>
+                
+                <div class="option-group" style="margin-bottom: 20px;">
+                    <label>Preset Dimensions</label>
+                    <select id="presets">
+                        <option value="">Custom</option>
+                        <option value="1920,1080">1920 × 1080 (HD)</option>
+                        <option value="3840,2160">3840 × 2160 (4K)</option>
+                        <option value="1080,1080">1080 × 1080 (Square)</option>
+                        <option value="1080,1920">1080 × 1920 (Vertical)</option>
+                    </select>
+                </div>
+                
+                <h2 style="margin-top: 20px;">3. Detected Shapes</h2>
+                <div class="shape-list" id="shapeList">
+                    <p style="color: #666; text-align: center; padding: 20px;">Upload and analyze an image to see shapes</p>
+                </div>
+                
+                <button class="btn btn-primary" id="downloadBtn" disabled style="margin-top: 20px;">
+                    ⬇️ Download .jsx Script
+                </button>
+                
+                <div id="status"></div>
+                
+                <div class="instructions" style="margin-top: 20px;">
+                    <h3 style="color: #4ecca3; margin-bottom: 10px;">How to use:</h3>
+                    <ol>
+                        <li>Upload your grid layout image</li>
+                        <li>Click "Analyze Grid" to detect rectangles</li>
+                        <li>Set your comp dimensions</li>
+                        <li>Download the .jsx script</li>
+                        <li>Run in After Effects (File → Scripts → Run Script File)</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let imageData = null;
+        let detectedShapes = [];
+        let gridLines = { vertical: [], horizontal: [] };
+        
+        // DOM Elements
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        const preview = document.getElementById('preview');
+        const canvasOverlay = document.getElementById('canvas-overlay');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const resultsDiv = document.getElementById('results');
+        const gridLinesDiv = document.getElementById('gridLines');
+        const shapeList = document.getElementById('shapeList');
+        const statusDiv = document.getElementById('status');
+        const presetsSelect = document.getElementById('presets');
+        
+        // Event Listeners
+        uploadZone.addEventListener('click', () => fileInput.click());
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        analyzeBtn.addEventListener('click', analyzeImage);
+        downloadBtn.addEventListener('click', generateScript);
+        
+        presetsSelect.addEventListener('change', (e) => {
+            if (e.target.value) {
+                const [w, h] = e.target.value.split(',');
+                document.getElementById('compWidth').value = w;
+                document.getElementById('compHeight').value = h;
+            }
+        });
+        
+        // Handle file upload
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                showStatus('Please upload an image file', 'error');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+                preview.onload = () => {
+                    // Set output dimensions to match input image
+                    document.getElementById('compWidth').value = preview.naturalWidth;
+                    document.getElementById('compHeight').value = preview.naturalHeight;
+                    document.getElementById('presets').value = ''; // Set to Custom
+                    
+                    analyzeBtn.disabled = false;
+                    showStatus('Image loaded (' + preview.naturalWidth + '×' + preview.naturalHeight + '). Click "Analyze Grid" to detect shapes.', 'info');
+                };
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // Analyze image for grid lines
+        function analyzeImage() {
+            showStatus('Analyzing image...', 'info');
+            
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = preview.naturalWidth;
+            canvas.height = preview.naturalHeight;
+            ctx.drawImage(preview, 0, 0);
+            
+            imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // Find vertical boundaries
+            const verticalLines = findVerticalBoundaries(imageData, width, height);
+            
+            // Find horizontal boundaries
+            const horizontalLines = findHorizontalBoundaries(imageData, width, height);
+            
+            gridLines = {
+                vertical: verticalLines.map(x => ({ px: x, pct: (x / width * 100).toFixed(2) })),
+                horizontal: horizontalLines.map(y => ({ px: y, pct: (y / height * 100).toFixed(2) }))
+            };
+            
+            // Build shapes from grid lines
+            detectedShapes = buildShapesFromGrid(gridLines, width, height);
+            
+            // Update UI
+            displayResults();
+            drawOverlay();
+            
+            downloadBtn.disabled = false;
+            showStatus(`Detected ${detectedShapes.length} shapes! Downloading script...`, 'success');
+            
+            // Auto-download the script
+            setTimeout(() => {
+                generateScript();
+            }, 500);
+        }
+        
+        function findVerticalBoundaries(imageData, width, height) {
+            const data = imageData.data;
+            // Sample many rows across the image
+            const numSamples = 30;
+            const sampleRows = [];
+            for (let i = 0; i < numSamples; i++) {
+                sampleRows.push(Math.floor(height * (i + 1) / (numSamples + 1)));
+            }
+            
+            // For each column, track how many samples show a boundary there
+            const boundaryVotes = new Array(width - 1).fill(0);
+            
+            for (const row of sampleRows) {
+                for (let x = 0; x < width - 1; x++) {
+                    const idx1 = (row * width + x) * 4;
+                    const idx2 = (row * width + x + 1) * 4;
+                    
+                    const diff = Math.sqrt(
+                        Math.pow(data[idx1] - data[idx2], 2) +
+                        Math.pow(data[idx1 + 1] - data[idx2 + 1], 2) +
+                        Math.pow(data[idx1 + 2] - data[idx2 + 2], 2)
+                    );
+                    
+                    if (diff > 30) { // Significant color change
+                        boundaryVotes[x]++;
+                    }
+                }
+            }
+            
+            // Find positions where at least 5% of samples show a boundary
+            // (this catches partial lines like the pink square edge)
+            const minVotes = Math.max(2, Math.floor(numSamples * 0.05));
+            const candidates = [];
+            for (let i = 0; i < boundaryVotes.length; i++) {
+                if (boundaryVotes[i] >= minVotes) {
+                    candidates.push(i);
+                }
+            }
+            
+            // Cluster nearby candidates
+            const lines = clusterPositions(candidates, 15);
+            
+            // Filter out edges
+            const margin = width * 0.02;
+            return lines.filter(x => x > margin && x < width - margin);
+        }
+        
+        function findHorizontalBoundaries(imageData, width, height) {
+            const data = imageData.data;
+            // Sample many columns across the image
+            const numSamples = 30;
+            const sampleCols = [];
+            for (let i = 0; i < numSamples; i++) {
+                sampleCols.push(Math.floor(width * (i + 1) / (numSamples + 1)));
+            }
+            
+            // For each row, track how many samples show a boundary there
+            const boundaryVotes = new Array(height - 1).fill(0);
+            
+            for (const col of sampleCols) {
+                for (let y = 0; y < height - 1; y++) {
+                    const idx1 = (y * width + col) * 4;
+                    const idx2 = ((y + 1) * width + col) * 4;
+                    
+                    const diff = Math.sqrt(
+                        Math.pow(data[idx1] - data[idx2], 2) +
+                        Math.pow(data[idx1 + 1] - data[idx2 + 1], 2) +
+                        Math.pow(data[idx1 + 2] - data[idx2 + 2], 2)
+                    );
+                    
+                    if (diff > 30) { // Significant color change
+                        boundaryVotes[y]++;
+                    }
+                }
+            }
+            
+            // Find positions where at least 5% of samples show a boundary
+            const minVotes = Math.max(2, Math.floor(numSamples * 0.05));
+            const candidates = [];
+            for (let i = 0; i < boundaryVotes.length; i++) {
+                if (boundaryVotes[i] >= minVotes) {
+                    candidates.push(i);
+                }
+            }
+            
+            // Cluster nearby candidates
+            const lines = clusterPositions(candidates, 15);
+            
+            // Filter out edges
+            const margin = height * 0.02;
+            return lines.filter(y => y > margin && y < height - margin);
+        }
+        
+        function clusterPositions(positions, minGap) {
+            if (positions.length === 0) return [];
+            
+            const sorted = [...positions].sort((a, b) => a - b);
+            const clusters = [[sorted[0]]];
+            
+            for (let i = 1; i < sorted.length; i++) {
+                if (sorted[i] - clusters[clusters.length - 1][clusters[clusters.length - 1].length - 1] <= minGap) {
+                    clusters[clusters.length - 1].push(sorted[i]);
+                } else {
+                    clusters.push([sorted[i]]);
+                }
+            }
+            
+            return clusters.map(c => Math.round(c.reduce((a, b) => a + b, 0) / c.length));
+        }
+        
+        function buildShapesFromGrid(gridLines, imgWidth, imgHeight) {
+            // Find all distinct colors and their bounding boxes
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = imgWidth;
+            canvas.height = imgHeight;
+            ctx.drawImage(preview, 0, 0);
+            
+            const imgData = ctx.getImageData(0, 0, imgWidth, imgHeight);
+            const data = imgData.data;
+            
+            // Map to store color regions: key = color string, value = bounds
+            const colorRegions = new Map();
+            
+            // Sample the image (every few pixels for speed)
+            const step = Math.max(1, Math.floor(Math.min(imgWidth, imgHeight) / 300));
+            
+            for (let y = 0; y < imgHeight; y += step) {
+                for (let x = 0; x < imgWidth; x += step) {
+                    const idx = (y * imgWidth + x) * 4;
+                    const r = data[idx];
+                    const g = data[idx + 1];
+                    const b = data[idx + 2];
+                    
+                    // Quantize color to reduce noise (group similar colors)
+                    const qr = Math.round(r / 16) * 16;
+                    const qg = Math.round(g / 16) * 16;
+                    const qb = Math.round(b / 16) * 16;
+                    const colorKey = `${qr},${qg},${qb}`;
+                    
+                    if (!colorRegions.has(colorKey)) {
+                        colorRegions.set(colorKey, {
+                            minX: x, maxX: x,
+                            minY: y, maxY: y,
+                            r: r, g: g, b: b,
+                            pixelCount: 0
+                        });
+                    }
+                    
+                    const region = colorRegions.get(colorKey);
+                    if (x < region.minX) region.minX = x;
+                    if (x > region.maxX) region.maxX = x;
+                    if (y < region.minY) region.minY = y;
+                    if (y > region.maxY) region.maxY = y;
+                    region.pixelCount++;
+                }
+            }
+            
+            // Convert to shapes array, filtering out small regions and edge colors
+            const shapes = [];
+            const minArea = imgWidth * imgHeight * 0.01; // At least 1% of image
+            
+            for (const [colorKey, region] of colorRegions) {
+                const width = region.maxX - region.minX;
+                const height = region.maxY - region.minY;
+                const area = width * height;
+                
+                // Skip tiny regions (noise) and regions touching all edges (likely background)
+                if (area < minArea) continue;
+                if (region.minX <= step && region.maxX >= imgWidth - step - 1 && 
+                    region.minY <= step && region.maxY >= imgHeight - step - 1) continue;
+                
+                shapes.push({
+                    left: region.minX / imgWidth,
+                    right: region.maxX / imgWidth,
+                    top: region.minY / imgHeight,
+                    bottom: region.maxY / imgHeight,
+                    color: [region.r / 255, region.g / 255, region.b / 255],
+                    area: area
+                });
+            }
+            
+            // Sort shapes by area (largest first), then by position
+            shapes.sort((a, b) => {
+                // First by top position (row)
+                const rowA = Math.floor(a.top * 10);
+                const rowB = Math.floor(b.top * 10);
+                if (rowA !== rowB) return rowA - rowB;
+                // Then by left position
+                return a.left - b.left;
+            });
+            
+            // Assign numbers
+            shapes.forEach((shape, i) => {
+                const numStr = (i + 1).toString().padStart(2, '0');
+                shape.num = numStr;
+                shape.name = `Shape_${numStr}`;
+            });
+            
+            return shapes;
+        }
+        
+        function getPixelColor(ctx, x, y) {
+            const pixel = ctx.getImageData(x, y, 1, 1).data;
+            return { r: pixel[0], g: pixel[1], b: pixel[2] };
+        }
+        
+        function colorDistance(c1, c2) {
+            return Math.sqrt(
+                Math.pow(c1.r - c2.r, 2) +
+                Math.pow(c1.g - c2.g, 2) +
+                Math.pow(c1.b - c2.b, 2)
+            );
+        }
+        
+        function displayResults() {
+            // Display detected shapes info
+            let html = '<div style="margin-bottom: 10px;"><strong>Detected ' + detectedShapes.length + ' Shapes:</strong></div>';
+            
+            detectedShapes.forEach((shape, i) => {
+                const leftPct = (shape.left * 100).toFixed(1);
+                const rightPct = (shape.right * 100).toFixed(1);
+                const topPct = (shape.top * 100).toFixed(1);
+                const bottomPct = (shape.bottom * 100).toFixed(1);
+                
+                html += `<div class="grid-line">
+                    <span class="label">${shape.num}</span>
+                    <span class="value">X: ${leftPct}%-${rightPct}% Y: ${topPct}%-${bottomPct}%</span>
+                </div>`;
+            });
+            
+            gridLinesDiv.innerHTML = html;
+            resultsDiv.style.display = 'block';
+            
+            // Display shapes
+            let shapesHtml = '';
+            detectedShapes.forEach(shape => {
+                const colorHex = rgbToHex(shape.color[0], shape.color[1], shape.color[2]);
+                const widthPct = ((shape.right - shape.left) * 100).toFixed(1);
+                const heightPct = ((shape.bottom - shape.top) * 100).toFixed(1);
+                
+                shapesHtml += `<div class="shape-item">
+                    <div class="shape-color" style="background: ${colorHex};"></div>
+                    <div class="shape-info">
+                        <div class="shape-name">${shape.num}</div>
+                        <div class="shape-dims">${widthPct}% × ${heightPct}%</div>
+                    </div>
+                </div>`;
+            });
+            shapeList.innerHTML = shapesHtml;
+        }
+        
+        function drawOverlay() {
+            const ctx = canvasOverlay.getContext('2d');
+            const rect = preview.getBoundingClientRect();
+            
+            canvasOverlay.width = preview.offsetWidth;
+            canvasOverlay.height = preview.offsetHeight;
+            canvasOverlay.style.width = preview.offsetWidth + 'px';
+            canvasOverlay.style.height = preview.offsetHeight + 'px';
+            
+            const scaleX = preview.offsetWidth / preview.naturalWidth;
+            const scaleY = preview.offsetHeight / preview.naturalHeight;
+            
+            // Draw shape outlines (actual bounds, not grid lines)
+            ctx.strokeStyle = '#4ecca3';
+            ctx.lineWidth = 2;
+            
+            detectedShapes.forEach(shape => {
+                const left = shape.left * preview.naturalWidth * scaleX;
+                const top = shape.top * preview.naturalHeight * scaleY;
+                const width = (shape.right - shape.left) * preview.naturalWidth * scaleX;
+                const height = (shape.bottom - shape.top) * preview.naturalHeight * scaleY;
+                
+                ctx.strokeRect(left, top, width, height);
+            });
+            
+            // Draw shape numbers
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            detectedShapes.forEach(shape => {
+                const centerX = ((shape.left + shape.right) / 2) * preview.naturalWidth * scaleX;
+                const centerY = ((shape.top + shape.bottom) / 2) * preview.naturalHeight * scaleY;
+                
+                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                ctx.fillRect(centerX - 18, centerY - 12, 36, 24);
+                
+                ctx.fillStyle = '#4ecca3';
+                ctx.fillText(shape.num, centerX, centerY);
+            });
+        }
+        
+        function rgbToHex(r, g, b) {
+            const toHex = (n) => Math.round(n * 255).toString(16).padStart(2, '0');
+            return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+        }
+        
+        function generateScript() {
+            const compWidth = parseInt(document.getElementById('compWidth').value);
+            const compHeight = parseInt(document.getElementById('compHeight').value);
+            const fontSize = parseInt(document.getElementById('fontSize').value);
+            const overlap = parseInt(document.getElementById('overlap').value);
+            
+            const overlapX = overlap / compWidth;
+            const overlapY = overlap / compHeight;
+            
+            // Build rectangles array string
+            let rectArrayStr = '';
+            detectedShapes.forEach((shape, i) => {
+                const isLast = i === detectedShapes.length - 1;
+                rectArrayStr += `            { 
+                name: "${shape.num}_Shape",
+                left: ${shape.left.toFixed(4)}, 
+                right: ${(shape.right).toFixed(4)} + overlapX,
+                top: ${shape.top.toFixed(4)}, 
+                bottom: ${(shape.bottom).toFixed(4)} + overlapY,
+                color: [${shape.color[0].toFixed(3)}, ${shape.color[1].toFixed(3)}, ${shape.color[2].toFixed(3)}]
+            }${isLast ? '' : ','}\n`;
+            });
+            
+            const script = `// After Effects Script - Grid Layout Generator
+// Auto-generated from image analysis
+// Shapes: ${detectedShapes.length}
+// Grid Lines - Vertical: ${gridLines.vertical.map(l => l.pct + '%').join(', ')}
+// Grid Lines - Horizontal: ${gridLines.horizontal.map(l => l.pct + '%').join(', ')}
+// Compatible with After Effects 2024
+
+(function() {
+    var comp = app.project.activeItem;
+    
+    if (!comp || !(comp instanceof CompItem)) {
+        alert("Please select a composition first.");
+        return;
+    }
+    
+    app.beginUndoGroup("Create Grid Layout - ${detectedShapes.length} Shapes");
+    
+    try {
+        var compWidth = ${compWidth};
+        var compHeight = ${compHeight};
+        var fontSize = ${fontSize};
+        var overlapPx = ${overlap};
+        
+        var overlapX = overlapPx / compWidth;
+        var overlapY = overlapPx / compHeight;
+        
+        var rectangles = [
+${rectArrayStr}        ];
+        
+        // Create each shape
+        for (var i = 0; i < rectangles.length; i++) {
+            var rect = rectangles[i];
+            var num = rect.name.substring(0, 2);
+            createGridShape(comp, rect, num, i + 1, compWidth, compHeight, fontSize);
+        }
+        
+        alert("Grid Layout created successfully!\\n\\n" +
+              "${detectedShapes.length} shape containers with null controls.\\n\\n" +
+              "• Each shape has 4 corner nulls + 1 controller\\n" +
+              "• Labels are centered in each shape\\n" +
+              "• Move corner nulls to adjust boundaries\\n" +
+              "• Move Controller null to transform entire shape");
+        
+    } catch (err) {
+        alert("Error: " + err.toString() + "\\n\\nLine: " + err.line);
+    }
+    
+    app.endUndoGroup();
+})();
+
+
+function createGridShape(comp, rect, numStr, instanceNum, compWidth, compHeight, fontSize) {
+    var left = rect.left * compWidth;
+    var right = rect.right * compWidth;
+    var top = rect.top * compHeight;
+    var bottom = rect.bottom * compHeight;
+    
+    left = Math.max(0, left);
+    right = Math.min(compWidth, right);
+    top = Math.max(0, top);
+    bottom = Math.min(compHeight, bottom);
+    
+    var centerX = (left + right) / 2;
+    var centerY = (top + bottom) / 2;
+    
+    var corners = [
+        { name: "TL", x: left, y: top },
+        { name: "TR", x: right, y: top },
+        { name: "BR", x: right, y: bottom },
+        { name: "BL", x: left, y: bottom }
+    ];
+    
+    var colorIndex = ((instanceNum - 1) % 16) + 1;
+    var rgb = rect.color;
+    
+    // Create Shape Layer
+    var shapeLayer = comp.layers.addShape();
+    shapeLayer.name = "Container " + numStr;
+    shapeLayer.property("Transform").property("Position").setValue([compWidth/2, compHeight/2]);
+    shapeLayer.label = colorIndex;
+    
+    // Create Text Layer
+    var textLayer = comp.layers.addText(numStr);
+    textLayer.name = "Label " + numStr;
+    textLayer.label = colorIndex;
+    
+    var textProp = textLayer.property("Source Text");
+    var textDoc = textProp.value;
+    textDoc.fontSize = fontSize;
+    textDoc.fillColor = [1, 1, 1];
+    textDoc.strokeColor = [0, 0, 0];
+    textDoc.strokeWidth = 2;
+    textDoc.font = "Arial-BoldMT";
+    textDoc.justification = ParagraphJustification.CENTER_JUSTIFY;
+    textDoc.applyStroke = true;
+    textDoc.applyFill = true;
+    textProp.setValue(textDoc);
+    
+    textLayer.property("Transform").property("Position").setValue([centerX, centerY]);
+    
+    // Create Controller null
+    var controller = comp.layers.addNull();
+    controller.name = "Controller " + numStr;
+    
+    // Separate dimensions on Position
+    controller.property("Transform").property("Position").dimensionsSeparated = true;
+    controller.property("Transform").property("X Position").setValue(centerX);
+    controller.property("Transform").property("Y Position").setValue(centerY);
+    
+    controller.label = colorIndex;
+    
+    // Create Corner nulls
+    var cornerNames = [];
+    var cornerFullNames = ["Top Left", "Top Right", "Bottom Right", "Bottom Left"];
+    
+    for (var i = 0; i < 4; i++) {
+        var cornerNull = comp.layers.addNull();
+        var cornerName = cornerFullNames[i] + " " + numStr;
+        cornerNull.name = cornerName;
+        cornerNames.push(cornerName);
+        
+        // Anchor at [0,0] so toComp([0,0]) returns the exact position
+        cornerNull.property("Transform").property("Anchor Point").setValue([0, 0]);
+        
+        // Separate dimensions on Position
+        cornerNull.property("Transform").property("Position").dimensionsSeparated = true;
+        cornerNull.property("Transform").property("X Position").setValue(corners[i].x);
+        cornerNull.property("Transform").property("Y Position").setValue(corners[i].y);
+        
+        cornerNull.property("Transform").property("Scale").setValue([30, 30]);
+        cornerNull.parent = controller;
+        cornerNull.label = colorIndex;
+    }
+    
+    textLayer.parent = controller;
+    
+    // Build Shape Layer Contents
+    var contents = shapeLayer.property("Contents");
+    var mainGroup = contents.addProperty("ADBE Vector Group");
+    mainGroup.name = "Rectangle";
+    var groupContents = mainGroup.property("Contents");
+    
+    var pathProperty = groupContents.addProperty("ADBE Vector Shape - Group");
+    var pathValue = pathProperty.property("Path");
+    
+    var initialShape = new Shape();
+    initialShape.vertices = [
+        [left - compWidth/2, top - compHeight/2],
+        [right - compWidth/2, top - compHeight/2],
+        [right - compWidth/2, bottom - compHeight/2],
+        [left - compWidth/2, bottom - compHeight/2]
+    ];
+    initialShape.inTangents = [[0,0], [0,0], [0,0], [0,0]];
+    initialShape.outTangents = [[0,0], [0,0], [0,0], [0,0]];
+    initialShape.closed = true;
+    pathValue.setValue(initialShape);
+    
+    var pathExpression = 'var tl = thisComp.layer("' + cornerNames[0] + '");\\n' +
+        'var tr = thisComp.layer("' + cornerNames[1] + '");\\n' +
+        'var br = thisComp.layer("' + cornerNames[2] + '");\\n' +
+        'var bl = thisComp.layer("' + cornerNames[3] + '");\\n' +
+        '\\n' +
+        'var points = [\\n' +
+        '    thisLayer.fromComp(tl.toComp([0,0])),\\n' +
+        '    thisLayer.fromComp(tr.toComp([0,0])),\\n' +
+        '    thisLayer.fromComp(br.toComp([0,0])),\\n' +
+        '    thisLayer.fromComp(bl.toComp([0,0]))\\n' +
+        '];\\n' +
+        '\\n' +
+        'createPath(points, [[0,0],[0,0],[0,0],[0,0]], [[0,0],[0,0],[0,0],[0,0]], true);';
+    
+    pathValue.expression = pathExpression;
+    
+    var fillProperty = groupContents.addProperty("ADBE Vector Graphic - Fill");
+    fillProperty.property("Color").setValue(rgb);
+    fillProperty.property("Opacity").setValue(100);
+    
+    var textPosExpr = 'var tl = thisComp.layer("' + cornerNames[0] + '").toComp([0,0]);\\n' +
+        'var br = thisComp.layer("' + cornerNames[2] + '").toComp([0,0]);\\n' +
+        '[(tl[0] + br[0]) / 2, (tl[1] + br[1]) / 2]';
+    
+    textLayer.property("Transform").property("Position").expression = textPosExpr;
+    textLayer.parent = null;
+    
+    // Lock the controller, container, and label so they can't be accidentally moved
+    controller.locked = true;
+    shapeLayer.locked = true;
+    textLayer.locked = true;
+}
+`;
+            
+            // Download the script
+            const blob = new Blob([script], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `GridLayout_${detectedShapes.length}Shapes.jsx`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showStatus('Script downloaded! Run it in After Effects.', 'success');
+        }
+        
+        function showStatus(message, type) {
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+        }
+    </script>
+</body>
+</html>
