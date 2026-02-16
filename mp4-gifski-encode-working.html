@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Encode — FFmpeg + Gifski Command Builder</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0e0e10; --surface: #18181b; --surface2: #1e1e22;
+    --border: #2a2a2e; --border-hover: #3a3a3e;
+    --text: #e4e4e7; --text-muted: #71717a; --text-dim: #52525b;
+    --accent: #196EFA; --accent-dim: rgba(25,110,250,0.15); --accent-glow: rgba(25,110,250,0.3);
+    --green: #22c55e; --green-dim: rgba(34,197,94,0.12);
+    --orange: #FCB116; --orange-dim: rgba(252,177,22,0.12);
+    --red: #F32C17; --red-dim: rgba(243,44,23,0.12);
+    --gif: #e44dff; --gif-dim: rgba(228,77,255,0.15); --gif-glow: rgba(228,77,255,0.3);
+    --radius: 10px; --radius-sm: 6px;
+  }
+  body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding:32px 24px; line-height:1.5; }
+  .app { max-width:720px; margin:0 auto; }
+  .header { margin-bottom:32px; }
+  .header h1 { font-family:'JetBrains Mono',monospace; font-size:28px; font-weight:700; letter-spacing:-0.5px; margin-bottom:6px; display:flex; align-items:center; gap:10px; }
+  .header h1 .dot { width:8px; height:8px; background:var(--accent); border-radius:50%; display:inline-block; box-shadow:0 0 12px var(--accent-glow); transition:all 0.3s; }
+  body.gif-mode .header h1 .dot { background:var(--gif); box-shadow:0 0 12px var(--gif-glow); }
+  .header p { color:var(--text-muted); font-size:14px; }
+
+  .mode-tabs { display:flex; gap:4px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:4px; margin-bottom:16px; }
+  .mode-tab { flex:1; background:transparent; border:none; border-radius:var(--radius-sm); color:var(--text-muted); font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600; padding:10px 16px; cursor:pointer; transition:all 0.25s; letter-spacing:0.5px; }
+  .mode-tab:hover { color:var(--text); }
+  .mode-tab.active { background:var(--accent-dim); color:var(--accent); }
+  .mode-tab.active.gif-active { background:var(--gif-dim); color:var(--gif); }
+
+  .section { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:24px; margin-bottom:16px; transition:border-color 0.2s; }
+  .section:hover { border-color:var(--border-hover); }
+  .section-label { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1.5px; color:var(--text-dim); margin-bottom:16px; }
+
+  .input-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+  .input-row.single { grid-template-columns:1fr; }
+  .input-row.triple { grid-template-columns:1fr 1fr 1fr; }
+  .input-row:last-child { margin-bottom:0; }
+
+  .field label { display:block; font-size:12px; font-weight:500; color:var(--text-muted); margin-bottom:6px; }
+  .field input[type="text"], .field input[type="number"], .field select {
+    width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm);
+    color:var(--text); font-family:'JetBrains Mono',monospace; font-size:13px; padding:10px 12px; outline:none; transition:border-color 0.2s,box-shadow 0.2s;
+  }
+  .field input:focus, .field select:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-dim); }
+  body.gif-mode .field input:focus, body.gif-mode .field select:focus { border-color:var(--gif); box-shadow:0 0 0 3px var(--gif-dim); }
+  .field select { cursor:pointer; appearance:none; background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2371717a' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; padding-right:32px; }
+  .field .hint { font-size:11px; color:var(--text-dim); margin-top:4px; font-family:'JetBrains Mono',monospace; }
+
+  .presets { display:flex; gap:8px; flex-wrap:wrap; }
+  .preset-btn { background:var(--surface2); border:1px solid var(--border); border-radius:20px; color:var(--text-muted); font-family:'DM Sans',sans-serif; font-size:12px; font-weight:500; padding:6px 14px; cursor:pointer; transition:all 0.2s; }
+  .preset-btn:hover { border-color:var(--accent); color:var(--text); background:var(--accent-dim); }
+  .preset-btn.active { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
+  body.gif-mode .preset-btn:hover { border-color:var(--gif); background:var(--gif-dim); }
+  body.gif-mode .preset-btn.active { border-color:var(--gif); color:var(--gif); background:var(--gif-dim); }
+
+  .slider-container { margin-bottom:12px; }
+  .slider-header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; }
+  .slider-header label { font-size:12px; font-weight:500; color:var(--text-muted); }
+  .slider-value { font-family:'JetBrains Mono',monospace; font-size:20px; font-weight:700; color:var(--text); }
+  .slider-value .unit { font-size:12px; font-weight:500; color:var(--text-muted); margin-left:2px; }
+
+  input[type="range"] { -webkit-appearance:none; width:100%; height:6px; background:var(--surface2); border-radius:3px; outline:none; cursor:pointer; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:20px; height:20px; background:var(--accent); border-radius:50%; cursor:pointer; box-shadow:0 0 10px var(--accent-glow); transition:transform 0.15s,background 0.3s,box-shadow 0.3s; }
+  input[type="range"]::-webkit-slider-thumb:hover { transform:scale(1.15); }
+  body.gif-mode input[type="range"]::-webkit-slider-thumb { background:var(--gif); box-shadow:0 0 10px var(--gif-glow); }
+
+  .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:16px; }
+  .stat { background:var(--surface2); border-radius:var(--radius-sm); padding:12px; text-align:center; }
+  .stat-value { font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:600; margin-bottom:2px; }
+  .stat-label { font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px; font-weight:500; }
+  .stat.good .stat-value { color:var(--green); }
+  .stat.warn .stat-value { color:var(--orange); }
+  .stat.bad .stat-value { color:var(--red); }
+
+  .quality-bar { height:4px; background:var(--surface2); border-radius:2px; margin-top:12px; overflow:hidden; }
+  .quality-fill { height:100%; border-radius:2px; transition:width 0.4s ease,background 0.4s ease; }
+  .quality-labels { display:flex; justify-content:space-between; margin-top:6px; font-size:10px; color:var(--text-dim); font-family:'JetBrains Mono',monospace; }
+
+  .toggle-row { display:flex; align-items:center; justify-content:space-between; padding:8px 0; }
+  .toggle-row label { font-size:13px; color:var(--text-muted); }
+  .toggle { position:relative; width:40px; height:22px; cursor:pointer; }
+  .toggle input { display:none; }
+  .toggle-track { position:absolute; inset:0; background:var(--surface2); border:1px solid var(--border); border-radius:11px; transition:all 0.2s; }
+  .toggle input:checked + .toggle-track { background:var(--accent-dim); border-color:var(--accent); }
+  body.gif-mode .toggle input:checked + .toggle-track { background:var(--gif-dim); border-color:var(--gif); }
+  .toggle-knob { position:absolute; top:3px; left:3px; width:16px; height:16px; background:var(--text-muted); border-radius:50%; transition:all 0.2s; pointer-events:none; }
+  .toggle input:checked ~ .toggle-knob { left:21px; background:var(--accent); }
+  body.gif-mode .toggle input:checked ~ .toggle-knob { background:var(--gif); }
+
+  .command-output { position:relative; background:#0a0a0c; border:1px solid var(--border); border-radius:var(--radius-sm); padding:16px; padding-right:56px; font-family:'JetBrains Mono',monospace; font-size:12px; line-height:1.7; color:var(--green); word-break:break-all; white-space:pre-wrap; max-height:280px; overflow-y:auto; }
+  .copy-btn { position:absolute; top:12px; right:12px; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-muted); font-family:'JetBrains Mono',monospace; font-size:11px; padding:6px 10px; cursor:pointer; transition:all 0.2s; z-index:2; }
+  .copy-btn:hover { border-color:var(--accent); color:var(--text); }
+  .copy-btn.copied { border-color:var(--green); color:var(--green); background:var(--green-dim); }
+
+  .video-panel { display:block; }
+  .gif-panel { display:none; }
+  body.gif-mode .video-panel { display:none; }
+  body.gif-mode .gif-panel { display:block; }
+
+  .callout { background:var(--surface2); border-left:3px solid var(--gif); border-radius:0 var(--radius-sm) var(--radius-sm) 0; padding:12px 14px; margin-bottom:12px; font-size:12px; color:var(--text-muted); line-height:1.6; }
+  .callout code { background:var(--bg); padding:2px 6px; border-radius:3px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text); }
+
+  .footer-note { text-align:center; color:var(--text-dim); font-size:11px; margin-top:24px; font-family:'JetBrains Mono',monospace; }
+  .footer-note code { background:var(--surface); padding:2px 6px; border-radius:3px; color:var(--text-muted); }
+
+  ::-webkit-scrollbar { width:6px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+  @media (max-width:520px) { .input-row,.input-row.triple { grid-template-columns:1fr; } .stats { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1><span class="dot"></span> Encode</h1>
+    <p>FFmpeg + Gifski command builder — set constraints, copy, paste into Terminal.</p>
+  </div>
+
+  <div class="mode-tabs">
+    <button class="mode-tab active" id="videoTab" onclick="setMode('video')">Video</button>
+    <button class="mode-tab" id="gifTab" onclick="setMode('gif')">GIF</button>
+  </div>
+
+  <!-- FILE -->
+  <div class="section">
+    <div class="section-label">File</div>
+    <div class="input-row single">
+      <div class="field">
+        <label>Input File Path</label>
+        <input type="text" id="inputPath" placeholder="/path/to/your/video.mov" spellcheck="false">
+        <div class="hint">drag a file onto Terminal to get the path, then paste here</div>
+      </div>
+    </div>
+    <div class="input-row">
+      <div class="field">
+        <label>Output Filename</label>
+        <input type="text" id="outputName" value="output" spellcheck="false">
+      </div>
+      <div class="field video-panel">
+        <label>Format</label>
+        <select id="outputFormat">
+          <option value="mp4">MP4 (H.264)</option>
+          <option value="webm">WebM (VP9)</option>
+          <option value="mov">MOV (ProRes Proxy)</option>
+        </select>
+      </div>
+      <div class="field gif-panel">
+        <label>Format</label>
+        <input type="text" value="GIF (gifski)" disabled style="color:var(--gif);border-color:var(--gif-dim);">
+      </div>
+    </div>
+  </div>
+
+  <!-- RESOLUTION -->
+  <div class="section">
+    <div class="section-label">Resolution</div>
+    <div class="presets">
+      <button class="preset-btn active" data-scale="1">Source</button>
+      <button class="preset-btn" data-scale="0.75">75%</button>
+      <button class="preset-btn" data-scale="0.5">50%</button>
+      <button class="preset-btn" data-scale="0.25">25%</button>
+    </div>
+  </div>
+
+  <!-- VIDEO: SIZE TARGET -->
+  <div class="section video-panel">
+    <div class="section-label">Size Target</div>
+    <div class="slider-container">
+      <div class="slider-header">
+        <label>Max File Size</label>
+        <div class="slider-value"><span id="sizeValue">100</span><span class="unit">MB</span></div>
+      </div>
+      <input type="range" id="sizeSlider" min="5" max="500" value="100" step="5">
+    </div>
+    <div class="input-row">
+      <div class="field">
+        <label>Duration (seconds)</label>
+        <input type="number" id="duration" value="58" min="1" step="1">
+      </div>
+      <div class="field">
+        <label>Frame Rate</label>
+        <select id="fps">
+          <option value="source">Match Source</option>
+          <option value="23.976">23.976</option>
+          <option value="24">24</option>
+          <option value="25">25</option>
+          <option value="29.97">29.97</option>
+          <option value="30" selected>30</option>
+          <option value="60">60</option>
+        </select>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat" id="bitrateStat"><div class="stat-value" id="bitrateValue">13.1</div><div class="stat-label">Mbps Video</div></div>
+      <div class="stat" id="bppStat"><div class="stat-value" id="bppValue">0.12</div><div class="stat-label">Bits/Pixel</div></div>
+      <div class="stat" id="estStat"><div class="stat-value" id="estValue">95</div><div class="stat-label">Est. MB</div></div>
+    </div>
+    <div class="quality-bar"><div class="quality-fill" id="qualityFill"></div></div>
+    <div class="quality-labels"><span>Low</span><span>Good</span><span>Overkill</span></div>
+  </div>
+
+  <!-- VIDEO: OPTIONS -->
+  <div class="section video-panel">
+    <div class="section-label">Options</div>
+    <div class="toggle-row">
+      <label>Two-pass encoding (better quality, slower)</label>
+      <label class="toggle"><input type="checkbox" id="twoPass" checked><div class="toggle-track"></div><div class="toggle-knob"></div></label>
+    </div>
+    <div class="toggle-row">
+      <label>Fast start (web/social optimization)</label>
+      <label class="toggle"><input type="checkbox" id="fastStart" checked><div class="toggle-track"></div><div class="toggle-knob"></div></label>
+    </div>
+    <div class="toggle-row">
+      <label>Strip audio</label>
+      <label class="toggle"><input type="checkbox" id="stripAudio"><div class="toggle-track"></div><div class="toggle-knob"></div></label>
+    </div>
+    <div class="toggle-row">
+      <label>Maximum render quality (lanczos)</label>
+      <label class="toggle"><input type="checkbox" id="maxQuality" checked><div class="toggle-track"></div><div class="toggle-knob"></div></label>
+    </div>
+    <div class="input-row single" style="margin-top:8px;">
+      <div class="field">
+        <label>Speed Preset</label>
+        <select id="preset">
+          <option value="ultrafast">Ultrafast (huge file, fast)</option>
+          <option value="fast">Fast</option>
+          <option value="medium">Medium (balanced)</option>
+          <option value="slow" selected>Slow (best for final)</option>
+          <option value="veryslow">Very Slow (max compression)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- GIF: SETTINGS -->
+  <div class="section gif-panel">
+    <div class="section-label">GIF Settings</div>
+    <div class="callout">
+      Gifski produces much higher quality GIFs than FFmpeg's built-in encoder.
+      Install with <code>brew install gifski</code>
+    </div>
+    <div class="slider-container">
+      <div class="slider-header">
+        <label>Quality</label>
+        <div class="slider-value"><span id="gifQualityValue">90</span><span class="unit">/ 100</span></div>
+      </div>
+      <input type="range" id="gifQuality" min="1" max="100" value="90" step="1">
+    </div>
+    <div class="slider-container">
+      <div class="slider-header">
+        <label>FPS</label>
+        <div class="slider-value"><span id="gifFpsValue">15</span><span class="unit">fps</span></div>
+      </div>
+      <input type="range" id="gifFps" min="5" max="30" value="15" step="1">
+    </div>
+    <div class="input-row triple">
+      <div class="field">
+        <label>Duration (seconds)</label>
+        <input type="number" id="gifDuration" value="58" min="1" step="1">
+      </div>
+      <div class="field">
+        <label>Trim Start (sec)</label>
+        <input type="number" id="gifTrimStart" value="0" min="0" step="0.1">
+      </div>
+      <div class="field">
+        <label>Trim End (sec)</label>
+        <input type="number" id="gifTrimEnd" value="" min="0" step="0.1" placeholder="optional">
+      </div>
+    </div>
+    <div class="toggle-row">
+      <label>Loop forever</label>
+      <label class="toggle"><input type="checkbox" id="gifLoop" checked><div class="toggle-track"></div><div class="toggle-knob"></div></label>
+    </div>
+    <div class="toggle-row">
+      <label>Also export MP4 alongside GIF</label>
+      <label class="toggle"><input type="checkbox" id="gifAlsoMp4"><div class="toggle-track"></div><div class="toggle-knob"></div></label>
+    </div>
+    <div class="stats">
+      <div class="stat" id="gifFramesStat"><div class="stat-value" id="gifFramesValue">870</div><div class="stat-label">Total Frames</div></div>
+      <div class="stat" id="gifEstStat"><div class="stat-value" id="gifEstValue">~Large</div><div class="stat-label">Size Warning</div></div>
+      <div class="stat" id="gifScaleStat"><div class="stat-value" id="gifScaleValue">Source</div><div class="stat-label">Scale</div></div>
+    </div>
+  </div>
+
+  <!-- COMMAND -->
+  <div class="section" style="position:relative;">
+    <div class="section-label">Terminal Command</div>
+    <div class="command-output" id="commandOutput"></div>
+    <button class="copy-btn" id="copyBtn" onclick="copyCommand()">Copy</button>
+  </div>
+
+  <div class="footer-note" id="footerNote">Requires <code>brew install ffmpeg</code></div>
+</div>
+
+<script>
+let currentMode = 'video';
+let currentScale = 1;
+const $ = id => document.getElementById(id);
+
+// === Mode ===
+function setMode(mode) {
+  currentMode = mode;
+  document.body.classList.toggle('gif-mode', mode === 'gif');
+  $('videoTab').classList.toggle('active', mode === 'video');
+  const gt = $('gifTab');
+  gt.classList.toggle('active', mode === 'gif');
+  gt.classList.toggle('gif-active', mode === 'gif');
+  $('footerNote').innerHTML = mode === 'video'
+    ? 'Requires <code>brew install ffmpeg</code>'
+    : 'Requires <code>brew install ffmpeg gifski</code>';
+  update();
+}
+
+// === Scale Presets ===
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentScale = parseFloat(btn.dataset.scale);
+    update();
+  });
+});
+
+// === Slider displays ===
+$('sizeSlider').addEventListener('input', function() { $('sizeValue').textContent = this.value; update(); });
+$('gifQuality').addEventListener('input', function() { $('gifQualityValue').textContent = this.value; update(); });
+$('gifFps').addEventListener('input', function() { $('gifFpsValue').textContent = this.value; update(); });
+
+// === All inputs ===
+['inputPath','outputName','outputFormat','duration','fps','twoPass','fastStart','stripAudio','maxQuality','preset',
+ 'gifDuration','gifTrimStart','gifTrimEnd','gifLoop','gifAlsoMp4'].forEach(id => {
+  const el = $(id);
+  el.addEventListener('input', update);
+  el.addEventListener('change', update);
+});
+
+// === Helpers ===
+function getOutputDir(input) {
+  if (input && input !== '/path/to/input.mov') {
+    const i = input.lastIndexOf('/');
+    if (i !== -1) return input.substring(0, i + 1);
+  }
+  return '';
+}
+
+function scaleFilter(scale, lanczos) {
+  // trunc(.../2)*2 ensures even dimensions for H.264
+  if (scale === 1) {
+    return lanczos ? 'scale=trunc(iw/2)*2:trunc(ih/2)*2:flags=lanczos' : '';
+  }
+  const flags = lanczos ? ':flags=lanczos' : '';
+  return 'scale=trunc(iw*' + scale + '/2)*2:trunc(ih*' + scale + '/2)*2' + flags;
+}
+
+function update() {
+  if (currentMode === 'video') updateVideo();
+  else updateGif();
+}
+
+// === VIDEO ===
+function updateVideo() {
+  const dur = parseFloat($('duration').value) || 60;
+  const maxMB = parseFloat($('sizeSlider').value) || 100;
+  const audioBR = $('stripAudio').checked ? 0 : 0.32;
+  const totalBR = (maxMB * 8) / dur;
+  const videoBR = Math.max(0.5, totalBR - audioBR);
+  const fpsVal = $('fps').value === 'source' ? 30 : parseFloat($('fps').value);
+  // BPP estimate assumes 1920x1080 source scaled
+  const estPixels = (1920 * currentScale) * (1080 * currentScale);
+  const bpp = (videoBR * 1000000) / (estPixels * fpsVal);
+
+  $('bitrateValue').textContent = videoBR.toFixed(1);
+  $('bppValue').textContent = bpp.toFixed(3);
+  const estMB = ((videoBR + audioBR) * dur / 8).toFixed(0);
+  $('estValue').textContent = estMB;
+
+  $('bppStat').className = 'stat ' + (bpp < 0.04 ? 'bad' : bpp < 0.07 ? 'warn' : 'good');
+  $('bitrateStat').className = 'stat ' + (videoBR < 2 ? 'bad' : videoBR < 5 ? 'warn' : 'good');
+  $('estStat').className = 'stat ' + (parseFloat(estMB) > maxMB ? 'bad' : 'good');
+
+  const qf = $('qualityFill');
+  const qp = Math.min(100, (bpp / 0.2) * 100);
+  qf.style.width = qp + '%';
+  qf.style.background = bpp < 0.04 ? 'var(--red)' : bpp < 0.07 ? 'var(--orange)' : bpp < 0.15 ? 'var(--green)' : 'var(--accent)';
+
+  buildVideoCmd(videoBR);
+}
+
+function buildVideoCmd(videoBR) {
+  const input = $('inputPath').value || '/path/to/input.mov';
+  const outName = $('outputName').value || 'output';
+  const fmt = $('outputFormat').value;
+  const is2P = $('twoPass').checked;
+  const isFS = $('fastStart').checked;
+  const noAudio = $('stripAudio').checked;
+  const isMaxQ = $('maxQuality').checked;
+  const presetVal = $('preset').value;
+  const fpsVal = $('fps').value;
+
+  const ext = fmt === 'webm' ? 'webm' : fmt === 'mov' ? 'mov' : 'mp4';
+  const dir = getOutputDir(input);
+  const output = dir + outName + '.' + ext;
+  const vbr = videoBR.toFixed(1) + 'M';
+
+  const sf = scaleFilter(currentScale, isMaxQ);
+  const vf = sf ? ' -vf "' + sf + '"' : '';
+  const fpsFlag = fpsVal !== 'source' ? ' -r ' + fpsVal : '';
+  const audioFlags = noAudio ? ' -an' : ' -c:a aac -b:a 320k';
+  const fastFlag = (isFS && fmt === 'mp4') ? ' -movflags +faststart' : '';
+
+  var cmd = '';
+  if (fmt === 'mov') {
+    cmd = 'ffmpeg -i "' + input + '"' + vf + fpsFlag + ' -c:v prores_ks -profile:v 0 -qscale:v 9' + audioFlags + ' "' + output + '"';
+  } else if (fmt === 'webm') {
+    if (is2P) {
+      cmd = 'ffmpeg -i "' + input + '"' + vf + fpsFlag + ' -c:v libvpx-vp9 -b:v ' + vbr + ' -pass 1 -an -f null /dev/null && \\\n' +
+            'ffmpeg -i "' + input + '"' + vf + fpsFlag + ' -c:v libvpx-vp9 -b:v ' + vbr + ' -pass 2' + audioFlags + ' "' + output + '"';
+    } else {
+      cmd = 'ffmpeg -i "' + input + '"' + vf + fpsFlag + ' -c:v libvpx-vp9 -crf 30 -b:v ' + vbr + audioFlags + ' "' + output + '"';
+    }
+  } else {
+    if (is2P) {
+      cmd = 'ffmpeg -i "' + input + '"' + vf + fpsFlag + ' -c:v libx264 -b:v ' + vbr + ' -preset ' + presetVal + ' -pass 1 -an -f null /dev/null && \\\n' +
+            'ffmpeg -i "' + input + '"' + vf + fpsFlag + ' -c:v libx264 -b:v ' + vbr + ' -preset ' + presetVal + ' -pass 2' + audioFlags + fastFlag + ' "' + output + '"';
+    } else {
+      cmd = 'ffmpeg -i "' + input + '"' + vf + fpsFlag + ' -c:v libx264 -b:v ' + vbr + ' -preset ' + presetVal + audioFlags + fastFlag + ' "' + output + '"';
+    }
+  }
+  setCommand(cmd);
+}
+
+// === GIF ===
+function updateGif() {
+  const dur = parseFloat($('gifDuration').value) || 58;
+  const gFps = parseInt($('gifFps').value) || 15;
+  const frames = Math.round(dur * gFps);
+
+  $('gifFramesValue').textContent = frames.toLocaleString();
+  $('gifScaleValue').textContent = currentScale === 1 ? 'Source' : Math.round(currentScale * 100) + '%';
+
+  var sizeWarn = 'Small', sizeCls = 'good';
+  if (currentScale > 0.5 && dur > 10) { sizeWarn = 'Medium'; sizeCls = 'warn'; }
+  if (currentScale > 0.5 && dur > 20) { sizeWarn = 'Large'; sizeCls = 'warn'; }
+  if (currentScale > 0.7 && dur > 20) { sizeWarn = 'Very Large'; sizeCls = 'bad'; }
+  if (currentScale > 0.7 && dur > 40) { sizeWarn = 'Huge'; sizeCls = 'bad'; }
+
+  $('gifEstValue').textContent = sizeWarn;
+  $('gifEstStat').className = 'stat ' + sizeCls;
+  $('gifFramesStat').className = 'stat good';
+  $('gifScaleStat').className = 'stat ' + (currentScale > 0.75 ? 'warn' : 'good');
+
+  buildGifCmd();
+}
+
+
+function buildGifCmd() {
+  const input = $('inputPath').value || '/path/to/input.mov';
+  const outName = $('outputName').value || 'output';
+  const dir = getOutputDir(input);
+  const output = dir + outName + '.gif';
+
+  const gFps = parseInt($('gifFps').value) || 15;
+  const quality = parseInt($('gifQuality').value) || 90;
+  const loop = $('gifLoop').checked;
+  const trimStart = parseFloat($('gifTrimStart').value) || 0;
+  const trimEnd = parseFloat($('gifTrimEnd').value) || 0;
+  const alsoMp4 = $('gifAlsoMp4').checked;
+
+  const framesDir = dir + '_gifframes_tmp';
+
+  // Scale filter for ffmpeg frame extraction (always lanczos for GIF)
+  const sf = currentScale === 1
+    ? 'scale=trunc(iw/2)*2:trunc(ih/2)*2:flags=lanczos'
+    : 'scale=trunc(iw*' + currentScale + '/2)*2:trunc(ih*' + currentScale + '/2)*2:flags=lanczos';
+
+  // Build a paste-safe mini script (no comments, no line-continuation backslashes).
+  const lines = [];
+  lines.push('(');
+  lines.push('set -e');
+  lines.push('command -v ffmpeg >/dev/null 2>&1 || { echo "ffmpeg not found. Install with: brew install ffmpeg"; exit 127; }');
+  lines.push('command -v gifski >/dev/null 2>&1 || { echo "gifski not found. Install with: brew install gifski"; exit 127; }');
+  lines.push('TMP="' + framesDir + '"');
+  lines.push('IN="' + input + '"');
+  lines.push('OUT="' + output + '"');
+  lines.push('mkdir -p "$TMP"');
+
+  // ffmpeg frame extraction
+  let ff = 'ffmpeg';
+  if (trimStart > 0) ff += ' -ss ' + trimStart;
+  ff += ' -i "$IN"';
+  if (trimEnd > 0) ff += ' -to ' + trimEnd;
+  ff += ' -vf "' + sf + ',fps=' + gFps + '" -y "$TMP/frame%04d.png"';
+  lines.push(ff);
+
+  // gifski encode
+  let gs = 'gifski --quality ' + quality + ' --fps ' + gFps;
+  gs += loop ? ' --repeat 0' : ' --repeat 1';
+  gs += ' -o "$OUT" "$TMP"/frame*.png';
+  lines.push(gs);
+
+  // cleanup
+  lines.push('rm -rf "$TMP"');
+  lines.push(')');
+
+  // Optional MP4 alongside GIF
+  if (alsoMp4) {
+    const mp4Out = dir + outName + '.mp4';
+    lines.push('');
+    let mp4 = 'ffmpeg';
+    if (trimStart > 0) mp4 += ' -ss ' + trimStart;
+    mp4 += ' -i "' + input + '"';
+    if (trimEnd > 0) mp4 += ' -to ' + trimEnd;
+    mp4 += ' -vf "' + sf + '" -r ' + gFps + ' -c:v libx264 -preset slow -crf 23 -an -movflags +faststart "' + mp4Out + '"';
+    lines.push(mp4);
+  }
+
+  setCommand(lines.join('\n'));
+}
+
+
+// === Command Display ===
+function setCommand(cmd) {
+  $('commandOutput').dataset.rawCmd = cmd;
+  $('commandOutput').innerHTML = highlightCmd(cmd);
+}
+
+function highlightCmd(cmd) {
+  var e = cmd.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return e
+    .replace(/(#.*)/gm, '<span style="color:var(--text-dim);font-style:italic;">$1</span>')
+    .replace(/(ffmpeg|gifski|mkdir|rm)/g, '<span style="color:var(--accent);font-weight:600;">$1</span>')
+    .replace(/(\s)(-[a-z_:%-]+)/g, '$1<span style="color:var(--orange);">$2</span>')
+    .replace(/(\\$)/gm, '<span style="color:var(--text-dim);">$1</span>')
+    .replace(/(".*?")/g, '<span style="color:#a78bfa;">$1</span>')
+    .replace(/(\/dev\/null)/g, '<span style="color:var(--text-dim);">$1</span>');
+}
+
+function copyCommand() {
+  var raw = $('commandOutput').dataset.rawCmd || '';
+  navigator.clipboard.writeText(raw).then(function() {
+    var btn = $('copyBtn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+update();
+</script>
+</body>
+</html>
